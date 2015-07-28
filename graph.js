@@ -1,5 +1,3 @@
-/*global require*/
-
 'use strict';
 
 var traverse = require('./traverse');
@@ -9,18 +7,16 @@ function isArrayOfObjects(v) {
     return Array.isArray(v) && v.length && typeof v[0] === 'object' && !Array.isArray(v[0]);
 }
 
-function graphFactory(categorizer, keyFormatter) {
+function graphFactory() {
 
     var graph = {};
-
-    keyFormatter = keyFormatter || ((k) => k);
 
     function createResourceMapFromArray(idFieldName, arr) {
         return arr.reduce((m, v)=> {
             if (v.hasOwnProperty(idFieldName)) {
                 m[v[idFieldName]] = v;
             } else {
-                console.warn("Field not found:" + idFieldName, 'in', v);
+                console.warn('Field not found:' + idFieldName, 'in', v);
             }
             return m;
         }, {});
@@ -33,17 +29,32 @@ function graphFactory(categorizer, keyFormatter) {
         }, {});
     }
 
-    function encode(json) {
+
+    var createMapper = function (mapping) {
+        return (parentKey, keys) => {
+            //var rx = /^([a-zA-Z0-9]+)?Id$/;
+            if (parentKey in mapping) {
+                var s = mapping[parentKey];
+                if (!s) return false;
+                if (keys.indexOf(s.idField) >= 0) {
+                    return s;
+                } else {
+                    console.error(keys);
+                    throw new Error('No field in keys: ' + s.idField);
+                }
+            } else {
+                console.error(keys);
+                throw new Error('No hash value for: ' + parentKey);
+            }
+        };
+    };
+
+    function encode(json, mapping) {
+        var categorizer = createMapper(mapping);
         traverse([json], function (key, val) {
-            var formattedKey = keyFormatter(key);
-            if (!formattedKey) throw new Error("Unable to format key: " + key);
-
-            this.key(formattedKey);
-
             if (isArrayOfObjects(val)) {
 
                 var d = categorizer(key, Object.keys(val[0]));
-
                 if (d) {
                     var idField = d.idField,
                         idRoot = d.groupName;
@@ -62,12 +73,7 @@ function graphFactory(categorizer, keyFormatter) {
         });
     }
 
-    function decode(graph) {
-        // TODO: decide graph to original json
-        return {};
-    }
-
-    function cursor(path) {
+    function cursor() {
         return {
             get: () => 42,
             set: (graph) => {
@@ -85,41 +91,35 @@ function graphFactory(categorizer, keyFormatter) {
     return {
         mergeJson: encode,
         cursor: cursor,
-        get: function () {
-            return graph;
+        get: function (path) {
+            if (!path) return {};
+            if (path.length === 1 && graph[path[0]]) {
+                return graph[path[0]];
+            }
+            if (path.length === 2 && graph[path[0]][path[1]]) {
+                return graph[path[0]][path[1]];
+            }
+            return null;
         }
     };
 
 }
 
-class GraphCache {
+class Graph {
 
-    constructor({ categorizer: categorizer, keyFormatter: keyFormatter }) {
-        this._graph = graphFactory(categorizer, keyFormatter);
+    constructor() {
+        this._graph = graphFactory();
     }
 
-    resolve(path) {
-        return this._graph.cursor(path);
+    get(path) {
+        return this._graph.get(path);
     }
 
-    get(dataResolver, path) {
-        return new Promise((resolve, reject)=> {
+    mergeJson(json, mapping) {
+        this._graph.mergeJson(json, mapping);
 
-            // TODO: check cache first
-
-            dataResolver(path)
-                .then((json)=> {
-                    this._graph.mergeJson(json);
-                    // TODO: resolve just the requested path
-                    resolve(this._graph.get());
-                })
-                .catch((err)=> {
-                    console.log('ERR', err);
-                    reject(err);
-                });
-        });
     }
 
 }
 
-module.exports = GraphCache;
+module.exports = Graph;

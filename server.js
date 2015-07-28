@@ -2,34 +2,15 @@
 
 'use strict';
 var fetch = require('node-fetch');
-var GraphRouter = require('./router');
-var GraphCache = require('./graph');
+var Router = require('./router');
+var Graph = require('./graph');
+var Cache = require('./cache');
 var koa = require('koa');
 var traverse = require('./traverse');
 var extend = require('extend');
 var app = koa();
 
 require('koa-qs')(app);
-
-function find(predicate) {
-    return function (list) {
-        if (typeof predicate !== 'function') {
-            throw new TypeError('predicate must be a function');
-        }
-        var list = Object(list);
-        var length = list.length >>> 0;
-        var thisArg = arguments[1];
-        var value;
-
-        for (var i = 0; i < length; i++) {
-            value = list[i];
-            if (predicate.call(thisArg, value, i, list)) {
-                return value;
-            }
-        }
-        return undefined;
-    };
-}
 
 
 function camelCase(input) {
@@ -59,47 +40,39 @@ class DataAdapter {
 
 var dataAdapter = new DataAdapter();
 
-var idFieldMap = {
-    '0': {
-        idField: 'id',
-        groupName: 'usersById'
-    }
-};
+var graph = new Graph();
 
-var graphCache = new GraphCache({
-    categorizer: (parentKey, keys) => {
-        //var rx = /^([a-zA-Z0-9]+)?Id$/;
-
-        if (parentKey in idFieldMap) {
-            var s = idFieldMap[parentKey];
-            if (!s) return false;
-            if (keys.indexOf(s.idField) >= 0) {
-                return s;
-            } else {
-                console.error(keys);
-                throw new Error('No field in keys: ' + s.idField);
-            }
-        } else {
-            console.error(keys);
-            throw new Error('No hash value for: ' + parentKey);
-        }
-    },
-    keyFormatter: camelCase
-});
-
-var graphRouter = new GraphRouter({
-    cache: graphCache,
+var router = new Router({
     routes: [{
         pattern: ['usersById', /\d+/],
-        handler: (args) => {
+        dataMapping: {
+            '0': {
+                idField: 'id',
+                groupName: 'usersById'
+            }
+        },
+        dataFetch: () => {
             return dataAdapter.get('users');
         }
     }, {
         pattern: ['postsById', /\d+/],
-        handler: (args) => {
+        dataMapping: {
+            '0': {
+                idField: 'id',
+                groupName: 'postsById'
+            }
+        },
+        dataFetch: () => {
             return dataAdapter.get('posts');
         }
     }]
+});
+
+
+
+var cache = new Cache({
+    graph: graph,
+    router: router
 });
 
 
@@ -121,8 +94,12 @@ app.use(function *(next) {
 
 // response
 app.use(function* () {
-    var data = yield graphRouter.handle(this.query);
-    this.body = data;
+    var { q: queries } = this.query;
+    var r = yield cache.read(queries);
+    console.log(r);
+    this.type = 'application/json';
+    this.body = r.body;
+    this.status = r.status || 200;
 });
 
 app.listen(3000);

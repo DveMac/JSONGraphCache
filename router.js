@@ -1,60 +1,46 @@
 /*global require*/
 
 'use strict';
+var R = require('ramda');
 
-function createRouter(routes, cache) {
+var asArray = (x) => Array.isArray(x) ? x : [x];
 
-    var l = console.log.bind(console, 'ROUTE MATCHER');
-    var matchCache = {};
+var asRegexp = R.map((x) => {
+    return x && ((typeof x.exec === 'function') ? x : new RegExp(x, 'i'));
+});
 
-    function ensureRegExp(query) {
-        return query && ((typeof query.exec === 'function') ? query : new RegExp(query, 'i'));
-    }
+var asRegexpArray = R.compose(asRegexp, asArray);
 
-    function match(pattern, pathParts) {
-        let key = pattern.join(',') + '~' + pathParts.join(',');
+var anyRegexMatches = (z, x) => R.any((regexp) => regexp.test(x))(asRegexpArray(z));
 
-        if (key in matchCache) {
-            l('Cache Hit', key);
-            return matchCache[key];
-        }
+function createRouter(routes) {
 
-        return (matchCache[key] = pattern.reduce((previous, query, idx) => {
-            let regexpes = Array.isArray(query) ? query.map(ensureRegExp) : [ensureRegExp(query)],
-                hasEnoughElements = (idx < pathParts.length),
-                matchesSome = hasEnoughElements &&
-                    regexpes.reduce((m, regexp)=> {
-                        return regexp || regexp.test(pathParts[idx]);
-                    }, true);
-            return (previous && hasEnoughElements && matchesSome);
-        }, true));
-    }
+    var match = R.memoize(function (pattern, pathParts) {
+        var i = 0;
+        return (pattern.length >= pathParts.length) &&
+            R.all((patternPart) => anyRegexMatches(patternPart, pathParts[i++]))(pattern);
+    });
 
     return (pathParts) => {
-        var matched = routes.find((route) => {
-            return match(route.pattern, pathParts);
-        });
-        return cache.get(matched.handler, pathParts);
+        return R.find((route) => match(route.pattern, pathParts))(routes);
     };
 
 }
 
-class GraphRouter {
+class Router {
 
-    constructor({cache: cache, routes: routes}) {
-        this._router = createRouter(routes, cache);
+    constructor({ routes: routes }) {
+        this._matcher = R.compose(
+            R.reject((x)=> !x),
+            R.map(createRouter(routes)));
     }
 
-    handle({q:queries}) {
-        if (!queries) {
-            return Promise.resolve();
-        }
-        queries = Array.isArray(queries) ? queries : [queries];
-        return Promise.all(queries
-            .map((p)=> p.split(','))
-            .map(this._router));
+    match(queries) {
+        return !queries ?
+            Promise.resolve({ status: 400 }) :
+            this._matcher(queries);
     }
 
 }
 
-module.exports = GraphRouter;
+module.exports = Router;
