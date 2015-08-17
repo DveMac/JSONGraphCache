@@ -44,7 +44,7 @@ var graph = new Graph();
 
 var router = new Router({
     routes: [{
-        pattern: ['usersById', /\d+/],
+        pattern: ['usersById', /\d+/, '*'],
         dataMapping: {
             '0': {
                 idField: 'id',
@@ -60,6 +60,11 @@ var router = new Router({
             '0': {
                 idField: 'id',
                 groupName: 'postsById'
+            },
+            'userId': function () {
+                return {
+                    groupName: 'usersById'
+                };
             }
         },
         dataFetch: () => {
@@ -95,11 +100,10 @@ app.use(function *(next) {
 // response
 app.use(function* () {
     var { q: queries } = this.query;
-    var r = yield cache.read(queries);
-    console.log(r);
+    var data = yield cache.read(queries);
     this.type = 'application/json';
-    this.body = r.body;
-    this.status = r.status || 200;
+    this.body = data;
+    this.status = 200;
 });
 
 app.listen(3000);

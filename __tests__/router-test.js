@@ -20,7 +20,7 @@ describe('router', function () {
             pattern: ['postsById', /\d+/, ['title', 'desc']],
             dataFetch: 'fn'
         }, {
-            pattern: ['postsById', /\d+/],
+            pattern: ['postsById', /\d+/, '*'],
             dataFetch: 'fn'
         }];
 
@@ -39,34 +39,29 @@ describe('router', function () {
         expect(r.match).toBeDefined();
     });
 
-    it('should handle a single string array query', function () {
-        expect(router.match([['postsById', '12']])).toEqual([
-            routes[3]
-        ]);
+    it('should handle a single query', function () {
+        expect(router.match(['usersById', '12']))
+            .toEqual(routes[1]);
     });
 
-    it('should handle a mutli string array query', function () {
-        expect(router.match([
-            ['postsById', '12'],
-            ['usersById', '53'],
-            ['somethingById', '55']
-        ]))
-            .toEqual([
-                routes[3],
-                routes[1]
-            ]);
+    it('should handle unmatched queries', function () {
+        expect(router.match(['somethingById', '55']))
+            .toEqual();
     });
 
-    it('should handle a mutli string array query', function () {
-        expect(router.match([
-            ['postsById','12','desc'],
-            ['postsById','12','cat'],
-            ['usersById','53','userName']
-        ]))
-            .toEqual([
-                routes[2],
-                routes[0]
-            ]);
+    it('should handle single option field queries', function () {
+        expect(router.match(['usersById', '53', 'userName']))
+            .toEqual(routes[0]);
+    });
+
+    it('shpuld handle multi option field queries', function () {
+        expect(router.match(['postsById', '53', 'title']))
+            .toEqual(routes[2]);
+    });
+
+    it('shpuld handle wildcard field queries', function () {
+        expect(router.match(['postsById', '53', 'cabbage']))
+            .toEqual(routes[3]);
     });
 
 });

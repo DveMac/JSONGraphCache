@@ -2,11 +2,13 @@
 
 'use strict';
 var R = require('ramda');
+//var log = require('./logger').createLogger('router');
 
 var asArray = (x) => Array.isArray(x) ? x : [x];
 
 var asRegexp = R.map((x) => {
-    return x && ((typeof x.exec === 'function') ? x : new RegExp(x, 'i'));
+    return x && ((typeof x.exec === 'function') ? x :
+            (x === '*' ? new RegExp('\w+', 'i') : new RegExp(x, 'i')));
 });
 
 var asRegexpArray = R.compose(asRegexp, asArray);
@@ -22,23 +24,17 @@ function createRouter(routes) {
     });
 
     return (pathParts) => {
-        return R.find((route) => match(route.pattern, pathParts))(routes);
+        var m = R.find((route) => match(route.pattern, pathParts))(routes);
+        //log.debug('match', pathParts, m);
+        return m;
     };
-
 }
 
 class Router {
 
     constructor({ routes: routes }) {
-        this._matcher = R.compose(
-            R.reject((x)=> !x),
-            R.map(createRouter(routes)));
-    }
-
-    match(queries) {
-        return !queries ?
-            Promise.resolve({ status: 400 }) :
-            this._matcher(queries);
+        //log.debug('constructor', routes);
+        this.match = createRouter(routes);
     }
 
 }

@@ -39,6 +39,7 @@ describe('graph', function () {
 
         test = [{
             event_id: 123,
+            user_id: 1,
             event_name: 'something',
             location: [{
                 location_id: 444,
@@ -82,6 +83,7 @@ describe('graph', function () {
             },
             eventById: {
                 '123': {
+                    user: ['usersById', 1],
                     event_id: 123,
                     event_name: 'something',
                     location: {
@@ -121,6 +123,7 @@ describe('graph', function () {
         graph.mergeJson(test, mapping);
 
         expect(graph.get(['locationById', '444'])).toEqual(expected.locationById['444']);
+        expect(graph.get(['eventById', '123', 'user']).user).toEqual(expected.eventById['123'].user);
 
     });
 

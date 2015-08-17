@@ -36,6 +36,7 @@ function graphFactory() {
             if (parentKey in mapping) {
                 var s = mapping[parentKey];
                 if (!s) return false;
+
                 if (keys.indexOf(s.idField) >= 0) {
                     return s;
                 } else {
@@ -57,11 +58,11 @@ function graphFactory() {
                 var d = categorizer(key, Object.keys(val[0]));
                 if (d) {
                     var idField = d.idField,
-                        idRoot = d.groupName;
+                        groupName = d.groupName;
 
-                    if (idField && idRoot) {
-                        this.val(createSymLinksFromArray(idRoot, idField, val));
-                        mergeIntoRoot(idRoot, createResourceMapFromArray(idField, val));
+                    if (idField && groupName) {
+                        this.val(createSymLinksFromArray(groupName, idField, val));
+                        mergeIntoRoot(groupName, createResourceMapFromArray(idField, val));
                     } else {
                         console.warn("Missing root key or id field", key, idField);
                     }
@@ -96,7 +97,7 @@ function graphFactory() {
             if (path.length === 1 && graph[path[0]]) {
                 return graph[path[0]];
             }
-            if (path.length === 2 && graph[path[0]][path[1]]) {
+            if (path.length === 2 && graph[path[0]] && graph[path[0]][path[1]]) {
                 return graph[path[0]][path[1]];
             }
             return null;
